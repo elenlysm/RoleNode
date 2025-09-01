@@ -47,4 +47,52 @@ for(const file of comandFiles){
 }
 
 client.commands = new Collection();
+client.once(Events.ClientReady, async () => {
+    console.log(`Ready! Logged in as ${client.user.tag}`);
 
+    //Deploy commands
+    await deployComands();
+    console.log(`Commands deployed  globally.`);
+
+    const statusType = process.env.BOT_STATUS || 'online';
+    const activityType = process.env.ACTIVITY_TYPE || 'PLAYING';
+    const activityName = process.env.ACTIVITY_NAME || 'Discord';
+
+    const activityTypeMap = {
+        'PLAYING': ActivityType.Playing,
+        'WATCHING': ActivityType.Watching,
+        'LISTENING': ActivityType.Listening,
+        'STREAMING': ActivityType.Streaming,
+    };
+
+    const statusMap = {
+        'online': PresenceUpdateStatus.Online,
+        'idle': PresenceUpdateStatus.Idle,
+        'do_not_disturb': PresenceUpdateStatus.DoNotDisturb,
+        'invisible': PresenceUpdateStatus.Invisible
+    };
+
+    client.user.setPresence({
+        status: statusMap[statusType],
+        activities: [{
+            name: activityName,
+            type: activityTypeMap[activityType]
+        }]
+    });
+
+    console.log(`Bot status set to: ${statusType}`);
+    console.log(`Activity set to: ${activityType} ${activityName}`)
+});
+
+client.on(Event.InteractionCreate, async interaction => {
+    if (!interaction.isChatImputCommand()) return
+
+    const command = client.commands.get(interaction.commandName);
+
+    if (!command){
+        console.error(`No command matching ${interaction.commandName} was found`)
+        return;
+    }
+
+    try 
+})
