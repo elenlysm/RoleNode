@@ -1,6 +1,6 @@
 require('dotenv').config();
 
-const {REST, routes, Client} = require('discord.js');
+const { REST, routes} = require('discord.js');
 const deployComands = async () => {
     //command logic
 };
@@ -35,18 +35,20 @@ const path = require('path');
 const commandsPath = path.join(__dirname, 'commands');
 const comandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
-for(const file of comandFiles){
+client.commands = new Collection();
+
+for (const file of comandFiles) {
     const filePath = path.join(commandsPath, file);
     const command = require(filePath);
 
-    if ('data' in command && 'execute' in command){
-        client.commands.set(comandFiles.data.name, command);
+    if ('data' in command && 'execute' in command) {
+        client.commands.set(command.data.name, command);
     } else {
         console.log(`The Command ${filePath} is missing a required "data" or "execute" property.`)
     }
 }
 
-client.commands = new Collection();
+
 client.once(Events.ClientReady, async () => {
     console.log(`Ready! Logged in as ${client.user.tag}`);
 
@@ -89,10 +91,21 @@ client.on(Event.InteractionCreate, async interaction => {
 
     const command = client.commands.get(interaction.commandName);
 
-    if (!command){
+    if (!command) {
         console.error(`No command matching ${interaction.commandName} was found`)
         return;
     }
 
-    try 
-})
+    try {
+        await command.execute(interaction);
+    } catch (error) {
+        console.error(error);
+        if (interaction.replied || interaction.deferred){
+            await interaction.followUp({ content: 'There was an error while executing this command', ephemeral: true });
+        } else {
+            await interaction.reply({ content: `There was an error while executing this command`, ephemeral: true });
+        }
+    }
+});
+
+client.login(process.env.BOT_TOKEN);
