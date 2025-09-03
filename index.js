@@ -1,10 +1,7 @@
 require('dotenv').config();
 
-const { REST, routes} = require('discord.js');
-const deployComands = async () => {
-    //command logic
-};
-
+const fs = require('fs');
+const path = require('path');
 const {
     Client,
     GatewayIntentBits,
@@ -12,7 +9,9 @@ const {
     Collection,
     ActivityType,
     PresenceUpdateStatus,
-    Events
+    Events,
+    REST,
+    Routes
 } = require('discord.js');
 
 const client = new Client({
@@ -20,22 +19,22 @@ const client = new Client({
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMembers
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildMessageReactions,
     ],
     partials: [
         Partials.Channel,
         Partials.Message,
         Partials.User,
-        Partials.GuildMember
+        Partials.GuildMember,
+        Partials.Reaction,
     ]
 });
 
-const fs = require('fs');
-const path = require('path');
+client.commands = new Collection();
+
 const commandsPath = path.join(__dirname, 'commands');
 const comandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
-
-client.commands = new Collection();
 
 for (const file of comandFiles) {
     const filePath = path.join(commandsPath, file);
@@ -48,13 +47,42 @@ for (const file of comandFiles) {
     }
 }
 
+const eventsPath = path.join(__dirname, 'events');
+
+if(fs.existsSync(eventsPath)){
+    const eventsFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
+
+    for (const file of eventsFiles){
+        const filePath = path.join(eventsPath, file);
+        const event = require(filePath);
+
+        if (event.once) {
+            client.once(event.name, (...args) => event.execute(...args, client));
+        } else {
+            client.on(event.name, (...args) => event.execute(...args, client));
+        }
+    }
+}
+
+const deployCommands = async () => {
+    const commandsJSON = client.commands.map(cmd => cmd.data.toJSON());
+    const rest = new REST({ version: '10'}).setToken(process.env.BOT_TOKEN);
+    try {
+        console.log('Deploying slash commands...');
+        
+        await rest.put( Routes.applicationCommands(process.env.CLIENT_ID), {
+            body: commandsJSON
+        });
+        console.log('Commands loaded globally');
+    } catch (error){
+        console.error('Commands deployment error', error);
+    }
+};
 
 client.once(Events.ClientReady, async () => {
     console.log(`Ready! Logged in as ${client.user.tag}`);
 
-    //Deploy commands
     await deployComands();
-    console.log(`Commands deployed  globally.`);
 
     const statusType = process.env.BOT_STATUS || 'online';
     const activityType = process.env.ACTIVITY_TYPE || 'PLAYING';
@@ -86,8 +114,8 @@ client.once(Events.ClientReady, async () => {
     console.log(`Activity set to: ${activityType} ${activityName}`)
 });
 
-client.on(Event.InteractionCreate, async interaction => {
-    if (!interaction.isChatImputCommand()) return
+client.on(Events.InteractionCreate, async interaction => {
+    if (!interaction.isChatInputCommand()) return
 
     const command = client.commands.get(interaction.commandName);
 
